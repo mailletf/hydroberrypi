@@ -1,5 +1,6 @@
 
 from prometheus_client import start_http_server, Gauge
+import argparse
 import urllib.request
 import json
 import time
@@ -117,15 +118,26 @@ def update_current_weather():
             logger.warning("Error updating weather: " + str(e))
 
 if __name__ == '__main__':
+
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument("-p", "--port", help="Port to use for web server",
+                            type=int, default=8000)
+    parser.add_argument("--disable-light-sensor", help="Disable reading from the light sensor", action="store_true")
+    parser.add_argument("--disable-reservoir-sensor", help="Disable reading from the reservoir temperature sensor", action="store_true")
+    parser.add_argument("--disable-ambiant-sensor", help="Disable reading from the ambiant temperature sensor", action="store_true")
+    parser.add_argument("--disable-weather", help="Disable fetching current weather", action="store_true")
+    args = parser.parse_args()
+
     # Start up the server to expose the metrics.
-    logger.info("Starting up HTTP server...")
-    start_http_server(8000)
+    logger.info("Starting up HTTP server on port %d..." % args.port)
+    start_http_server(args.port)
 
     logger.info("Starting main loop...")
     while True:
         logger.debug("Polling sensors")
-        update_light_intensity()
-        update_reservoir_temp()
-        update_ambiant_temp()
-        update_current_weather()
+        if not args.disable_light_sensor: update_light_intensity()
+        if not args.disable_reservoir_sensor: update_reservoir_temp()
+        if not args.disable_ambiant_sensor: update_ambiant_temp()
+        if not args.disable_weather: update_current_weather()
         time.sleep(5)
