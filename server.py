@@ -1,11 +1,15 @@
 
-from prometheus_client import start_http_server, Gauge
 import argparse
-import urllib.request
 import json
-import time
-import os
 import logging
+import os
+import time
+import threading
+import urllib.request
+
+from http.server import BaseHTTPRequestHandler, HTTPServer
+
+from prometheus_client import start_http_server, Gauge
 
 # Import SPI library (for hardware SPI) and MCP3008 library.
 import Adafruit_GPIO.SPI as SPI
@@ -117,6 +121,26 @@ def update_current_weather():
         except Exception as e:
             logger.warning("Error updating weather: " + str(e))
 
+
+class S(BaseHTTPRequestHandler):
+    def _set_headers(self):
+        self.send_response(200)
+        self.send_header('Content-type', 'application/json')
+        self.end_headers()
+
+    def do_GET(self):
+        self._set_headers()
+        data = {"temperature": AMBIANT_TEMP._value.get()}
+        self.wfile.write(json.dumps(data).encode())
+
+    def do_HEAD(self):
+        self._set_headers()
+
+    def do_POST(self):
+        # Doesn't do anything with posted data
+        self._set_headers()
+        self.wfile.write("<html><body><h1>POST!</h1></body></html>")
+
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
@@ -129,7 +153,13 @@ if __name__ == '__main__':
     parser.add_argument("--disable-weather", help="Disable fetching current weather", action="store_true")
     args = parser.parse_args()
 
-    # Start up the server to expose the metrics.
+    # start the json server
+    server_address = ('', 8001)
+    httpd = HTTPServer(server_address, S)
+    print('Starting httpd...')
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+
+    # Start up the prometheus server to expose the metrics.
     logger.info("Starting up HTTP server on port %d..." % args.port)
     start_http_server(args.port)
 
